@@ -558,7 +558,15 @@
   function login() {
     var pw = document.getElementById("pwd").value;
     fetch("/api/products", { headers: { "x-admin-password": pw } })
-      .then(function (r) { if (!r.ok) throw new Error("bad"); return r.json(); })
+      .then(function (r) {
+        if (r.status === 401) throw new Error("Mot de passe incorrect.");
+        if (r.status === 503) throw new Error("L’accès administrateur n’est pas configuré. Configurez ADMIN_PASSWORD dans les variables d’environnement Netlify, puis redéployez le site.");
+        if (!r.ok) throw new Error("Le service de connexion est indisponible. Réessayez après le déploiement.");
+        return r.json().then(function (data) {
+          if (!Array.isArray(data)) throw new Error("Réponse du service de connexion invalide.");
+          return data;
+        });
+      })
       .then(function (data) {
         ADMIN_PW = pw;
         products = Array.isArray(data) ? data : [];
@@ -568,8 +576,8 @@
         renderAdmin(); renderGrid();
         document.getElementById("adminOverlay").classList.add("open");
       })
-      .catch(function () {
-        document.getElementById("loginErr").textContent = "Mot de passe incorrect ou serveur indisponible.";
+      .catch(function (error) {
+        document.getElementById("loginErr").textContent = error.message || "Le service de connexion est indisponible.";
       });
   }
   document.getElementById("pwd").addEventListener("keydown", function (e) { if (e.key === "Enter") login(); });
